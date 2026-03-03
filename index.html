@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mewgenics Breeding Registry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0c0b09; --surf:#151412; --surf2:#1c1a17; --surf3:#23211d;
+  --bdr:#2a2824; --bdr2:#35332d; --bdr3:#403e38;
+  --gold:#d4b254; --gold2:#a68832; --gold3:rgba(212,178,84,.10);
+  --txt:#e8e0d0; --txt2:#b8b0a0; --muted:#716b63;
+  --green:#5aaa6f; --gbg:rgba(90,170,111,.10); --gbdr:rgba(90,170,111,.25);
+  --red:#c06060;   --rbg:rgba(192,96,96,.10);  --rbdr:rgba(192,96,96,.25);
+  --orange:#d09050; --obg:rgba(208,144,80,.10); --obdr:rgba(208,144,80,.25);
+  --blue:#70a8d0;  --purple:#a080c8;
+  --male:#70a8d0;  --female:#d07080; --unk:#a080c8;
+  --r:6px;
+  --font:'JetBrains Mono','Fira Code','Courier New',monospace;
+  --head:'Playfair Display',Georgia,serif;
+}
+html{background:var(--bg)}
+body{color:var(--txt);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh}
+
+/* ── upload screen ─────────────────────────────────────── */
+#upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:32px;padding:40px;animation:fadeIn .6s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.upload-logo{font-size:80px;filter:drop-shadow(0 0 20px rgba(212,178,84,.2));animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.upload-title{font-family:var(--head);font-size:36px;color:var(--gold);text-align:center;letter-spacing:.02em}
+.upload-sub{color:var(--muted);font-size:15px;text-align:center;max-width:460px;line-height:1.7}
+
+#drop-zone{width:460px;max-width:90vw;height:220px;border:2px dashed var(--bdr2);border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;transition:.3s;background:var(--surf);position:relative}
+#drop-zone:hover,#drop-zone.over{border-color:var(--gold);background:var(--gold3)}
+#drop-zone .icon{font-size:44px;opacity:.6}
+#drop-zone .label{color:var(--txt2);font-size:15px}
+#drop-zone .sub{color:var(--muted);font-size:13px}
+#drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:20px;padding:40px}
+.spinner{width:52px;height:52px;border:3px solid var(--bdr2);border-top-color:var(--gold);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#load-status{color:var(--txt2);font-size:15px;text-align:center}
+#load-error{color:var(--red);font-size:14px;max-width:500px;text-align:center;display:none;
+  background:var(--rbg);border:1px solid var(--rbdr);padding:12px 18px;border-radius:var(--r)}
+
+/* ── report layout ─────────────────────────────────────── */
+#report-screen{display:none}
+#shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:56px 1fr;height:100vh;overflow:hidden}
+
+#topbar{grid-column:1/-1;background:var(--surf);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;padding:0 24px;gap:16px}
+#topbar h1{font-family:var(--head);font-size:20px;color:var(--gold);letter-spacing:.02em}
+#topbar .meta{font-size:13px;color:var(--muted);margin-left:6px}
+#topbar .paw{font-size:28px;filter:drop-shadow(0 0 4px rgba(212,178,84,.3))}
+#topbar .spacer{flex:1}
+.badge{background:var(--surf2);border:1px solid var(--bdr2);
+  color:var(--txt2);font-size:12px;padding:4px 12px;border-radius:14px}
+#btn-new{background:var(--surf2);border:1px solid var(--bdr2);color:var(--gold);
+  font-family:var(--font);font-size:13px;padding:5px 14px;border-radius:14px;cursor:pointer;transition:.2s}
+#btn-new:hover{background:var(--gold3);border-color:var(--gold2)}
+
+/* sidebar */
+#sidebar{background:var(--surf);border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+#search-wrap{padding:12px 12px 0}
+#search{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);
+  padding:8px 12px;border-radius:var(--r);font-family:var(--font);font-size:14px;outline:none}
+#search:focus{border-color:var(--gold2)}
+#cat-list{flex:1;overflow-y:auto;padding:8px 6px}
+
+.catrow{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 12px;border-radius:var(--r);cursor:pointer;transition:.15s}
+.catrow:hover{background:var(--surf2)}
+.catrow.sel{background:var(--gold3);border:1px solid var(--gold2)}
+.catrow .cname{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* gender badges */
+.gb{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;
+  width:30px;height:30px;font-size:17px;font-weight:700;flex-shrink:0}
+.gb-lg{width:40px;height:40px;font-size:22px}
+.gm{background:rgba(112,168,208,.12);color:var(--male);border:1px solid rgba(112,168,208,.25)}
+.gf{background:rgba(208,112,128,.12);color:var(--female);border:1px solid rgba(208,112,128,.25)}
+.gu{background:rgba(160,128,200,.12);color:var(--unk);border:1px solid rgba(160,128,200,.25)}
+
+#main{overflow-y:auto;padding:24px 32px;background:var(--bg)}
+
+/* tabs */
+#tab-bar{display:flex;gap:2px;margin-bottom:18px;justify-content:center}
+.tab-btn{background:var(--surf);border:1px solid var(--bdr);border-bottom:none;
+  color:var(--muted);font-family:var(--font);font-size:14px;padding:10px 22px;
+  border-radius:var(--r) var(--r) 0 0;cursor:pointer;transition:.15s}
+.tab-btn:hover{color:var(--txt2);background:var(--surf2)}
+.tab-btn.on{background:var(--gold3);color:var(--gold);border-color:var(--gold2)}
+.cnt{display:inline-block;min-width:20px;text-align:center;font-size:12px;
+  padding:2px 6px;border-radius:10px;margin-left:5px;font-weight:600}
+.ck{background:var(--gbg);color:var(--green)}
+.cb{background:var(--rbg);color:var(--red)}
+.co{background:var(--obg);color:var(--orange)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* panels */
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:18px}
+.ph{padding:16px 20px;border-bottom:1px solid var(--bdr);font-family:var(--head);
+  font-size:20px;color:var(--gold);display:flex;align-items:center;justify-content:center;gap:10px;text-align:center}
+.ph .sub{font-family:var(--font);font-size:12px;color:var(--muted);font-weight:400}
+.pb{padding:20px 24px}
+
+/* profile - centered */
+.profile-header{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px}
+.pname{font-family:var(--head);font-size:26px;color:var(--txt)}
+.profile-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;justify-content:center}
+.stat-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:12px 18px;min-width:100px;text-align:center}
+.stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.stat-value{font-size:16px;font-weight:500}
+.pparents{font-size:14px;color:var(--txt2);text-align:center}
+.plink-active{cursor:pointer;color:var(--blue)}.plink-active:hover{text-decoration:underline}
+.plink-inactive{color:var(--muted);cursor:default}
+
+/* stat squares */
+.stat-grid{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.stat-sq{display:flex;flex-direction:column;align-items:center;gap:4px}
+.stat-sq-box{width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1)}
+.stat-sq-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+/* offspring stat range squares */
+.stat-range-grid{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.stat-range-item{display:flex;flex-direction:column;align-items:center;gap:3px}
+.stat-range-box{width:54px;height:36px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}
+.stat-range-label{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600}
+
+/* compat - unified table */
+#compat-controls{display:flex;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bdr);align-items:center;flex-wrap:wrap;justify-content:center}
+#compat-search{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);
+  padding:7px 12px;border-radius:var(--r);font-family:var(--font);font-size:13px;outline:none;width:200px}
+#compat-search:focus{border-color:var(--gold2)}
+.sort-btn,.filter-btn{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt2);
+  font-family:var(--font);font-size:12px;padding:6px 12px;border-radius:var(--r);cursor:pointer;transition:.15s}
+.sort-btn:hover,.filter-btn:hover{color:var(--gold);border-color:var(--gold2)}
+.sort-btn.on,.filter-btn.on{color:var(--gold);border-color:var(--gold2);background:var(--gold3)}
+
+#clist{padding:8px 0;max-height:60vh;overflow-y:auto}
+.cr{display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:.12s;font-size:14px;justify-content:center;flex-wrap:wrap}
+.cr:hover{background:var(--surf2)}
+.cr-name{display:flex;align-items:center;gap:8px;min-width:160px}
+.cr-risk{font-size:13px;padding:3px 10px;border-radius:10px;font-weight:500;white-space:nowrap}
+.cr-risk.safe{background:var(--gbg);color:var(--green);border:1px solid var(--gbdr)}
+.cr-risk.moderate{background:var(--obg);color:var(--orange);border:1px solid var(--obdr)}
+.cr-risk.high{background:var(--rbg);color:var(--red);border:1px solid var(--rbdr)}
+.cr-reason{color:var(--txt2);font-size:13px;text-align:center;flex:1}
+.cdet{display:none;padding:6px 18px 12px;font-size:13px;color:var(--txt2);text-align:center}
+.cdet.open{display:block}
+.stag{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;
+  padding:2px 8px;font-size:12px;margin:3px;display:inline-block;cursor:pointer}
+.stag:hover{border-color:var(--gold2);color:var(--gold)}
+
+/* pedigree tree */
+.tree-wrap{overflow:auto;padding:18px 0;position:relative}
+.tree-container{position:relative;margin:0 auto}
+.tree-container svg{position:absolute;top:0;left:0;pointer-events:none}
+.tree-container svg line{stroke:var(--bdr2);stroke-width:1.5}
+.tcard{position:absolute;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);
+  text-align:center;font-size:12px;cursor:pointer;transition:.15s;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box}
+.tcard:hover{border-color:var(--gold2);background:var(--surf3)}
+.tcard.root{border-color:var(--gold);background:var(--gold3)}
+.tcard.ghost{opacity:.45;font-style:italic;cursor:default}
+.tcard .tn{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 4px}
+.tcard .tm{color:var(--muted);font-size:10px;margin-top:1px}
+.tree-legend{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:18px;justify-content:center}
+.tree-legend span{display:flex;align-items:center;gap:4px}
+
+/* empty */
+#empty{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:100%;gap:14px;color:var(--muted);padding:60px;
+  text-align:center;line-height:1.8;font-size:16px}
+#empty .big{font-size:64px;line-height:1;filter:grayscale(.4)}
+
+/* settings */
+#settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
+  align-items:center;justify-content:center}
+#settings-overlay.open{display:flex}
+#settings-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:10px;
+  padding:24px 28px;width:400px;max-width:90vw}
+#settings-box h2{font-family:var(--head);font-size:20px;color:var(--gold);margin-bottom:16px}
+.setting-row{margin-bottom:16px}
+.setting-row label{display:block;font-size:13px;color:var(--txt2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.setting-row .range-wrap{display:flex;align-items:center;gap:10px}
+.setting-row input[type=range]{flex:1;accent-color:var(--gold);height:4px}
+.setting-row .range-val{font-size:16px;font-weight:600;color:var(--gold);min-width:28px;text-align:center}
+.setting-row .hint{font-size:12px;color:var(--muted);margin-top:4px}
+#settings-apply{background:var(--gold3);border:1px solid var(--gold2);color:var(--gold);font-family:var(--font);
+  font-size:14px;padding:8px 20px;border-radius:var(--r);cursor:pointer;margin-top:4px;transition:.2s}
+#settings-apply:hover{background:var(--gold);color:var(--bg)}
+#settings-close{background:var(--surf2);border:1px solid var(--bdr);color:var(--muted);font-family:var(--font);
+  font-size:14px;padding:8px 16px;border-radius:var(--r);cursor:pointer;margin-top:4px;margin-left:8px}
+#btn-settings{background:var(--surf2);border:1px solid var(--bdr2);color:var(--txt2);
+  font-family:var(--font);font-size:13px;padding:5px 14px;border-radius:14px;cursor:pointer;transition:.2s}
+#btn-settings:hover{background:var(--gold3);border-color:var(--gold2);color:var(--gold)}
+
+/* mutation */
+.mutation-badge{display:inline-block;padding:3px 12px;border-radius:10px;font-size:13px;font-weight:500}
+.mutation-badge.has{background:var(--rbg);border:1px solid var(--rbdr);color:var(--red)}
+.mutation-badge.clean{background:var(--gbg);border:1px solid var(--gbdr);color:var(--green)}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surf)}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--gold2)}
+</style>
+</head>
+<body>
+
+<!-- UPLOAD SCREEN -->
+<div id="upload-screen">
+  <div class="upload-logo">🐱</div>
+  <div class="upload-title">Mewgenics Breeding Registry</div>
+  <div class="upload-sub">Drop your <strong style="color:var(--gold)">.sav</strong> file below to analyze cat pedigrees, find compatible breeding pairs, and avoid inbreeding.</div>
+  <div id="drop-zone">
+    <div class="icon">📂</div>
+    <div class="label">Drop <strong>.sav</strong> file here or click to browse</div>
+    <div class="sub">steamcampaign01.sav · steamcampaign02.sav · etc.</div>
+    <input type="file" accept=".sav" id="file-input">
+  </div>
+  <div class="upload-sub" style="font-size:12px;max-width:540px">
+    <span style="color:var(--txt2)">Save files are usually located at:</span><br>
+    <code style="font-size:11px;color:var(--gold);background:var(--surf);padding:4px 10px;border-radius:4px;border:1px solid var(--bdr);display:inline-block;margin-top:4px;word-break:break-all">C:\Users\&lt;YourUser&gt;\AppData\Roaming\Glaiel Games\Mewgenics\&lt;SteamID&gt;\saves\</code>
+  </div>
+  <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:20px 24px;width:420px;max-width:90vw;margin-top:4px">
+    <div style="font-family:var(--head);font-size:16px;color:var(--gold);margin-bottom:12px;text-align:center">Analysis Settings</div>
+    <div class="setting-row">
+      <label>Inbreeding Check Depth</label>
+      <div class="range-wrap"><input type="range" id="pre-gen" min="1" max="8" value="3"><span class="range-val" id="pre-gen-val">3</span></div>
+      <div class="hint">How many generations back to check for shared ancestors.</div>
+    </div>
+    <div class="setting-row" style="margin-bottom:8px">
+      <label>Pedigree Tree Depth</label>
+      <div class="range-wrap"><input type="range" id="pre-tree" min="2" max="8" value="5"><span class="range-val" id="pre-tree-val">5</span></div>
+      <div class="hint">How many ancestor generations to display in the tree view.</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-align:center">You can adjust these at any time via the <strong style="color:var(--txt2)">Settings</strong> button in the top-right of the report.</div>
+  </div>
+  <div class="upload-sub" style="font-size:12px;opacity:.6">Everything runs locally in your browser. No data is uploaded anywhere.</div>
+</div>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="spinner" id="load-spinner"></div>
+  <div id="load-status">Loading sql.js…</div>
+  <div id="load-error"></div>
+  <button id="load-retry" style="display:none;background:var(--surf2);border:1px solid var(--bdr2);color:var(--gold);
+    font-family:var(--font);font-size:14px;padding:8px 20px;border-radius:var(--r);cursor:pointer;margin-top:8px"
+    onclick="location.reload()">↻ Try Again</button>
+</div>
+
+<!-- REPORT SCREEN -->
+<div id="report-screen">
+<div id="shell">
+  <div id="topbar">
+    <span class="paw">🐾</span>
+    <h1>Breeding Registry</h1>
+    <span class="meta" id="save-name"></span>
+    <span class="spacer"></span>
+    <span class="badge" id="gen-badge"></span>
+    <span class="badge" id="day-badge"></span>
+    <button id="btn-settings">⚙ Settings</button>
+    <button id="btn-new">↻ New File</button>
+  </div>
+  <div id="sidebar">
+    <div id="search-wrap"><input type="text" id="search" placeholder="🔍 Search cats…"></div>
+    <div id="cat-list"></div>
+  </div>
+  <div id="main"></div>
+</div>
+<div id="settings-overlay">
+  <div id="settings-box">
+    <h2>⚙ Settings</h2>
+    <div class="setting-row">
+      <label>Inbreeding Check Depth</label>
+      <div class="range-wrap"><input type="range" id="s-gen" min="1" max="8" value="3"><span class="range-val" id="s-gen-val">3</span></div>
+      <div class="hint">How many generations back to check for shared ancestors.</div>
+    </div>
+    <div class="setting-row">
+      <label>Pedigree Tree Depth</label>
+      <div class="range-wrap"><input type="range" id="s-tree" min="2" max="8" value="5"><span class="range-val" id="s-tree-val">5</span></div>
+      <div class="hint">How many ancestor generations to display in the tree view.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end">
+      <button id="settings-close">Cancel</button>
+      <button id="settings-apply">Apply</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  LZ4 BLOCK DECOMPRESSOR
+// ═══════════════════════════════════════════════════════════════
+function lz4DecompressBlock(src, uncompressedSize) {
+  const dst = new Uint8Array(uncompressedSize);
+  let si = 0, di = 0;
+  while (si < src.length) {
+    const token = src[si++];
+    let litLen = (token >> 4) & 0x0F;
+    if (litLen === 15) { while (si < src.length) { const e = src[si++]; litLen += e; if (e !== 255) break; } }
+    const count = Math.min(litLen, src.length - si, uncompressedSize - di);
+    dst.set(src.subarray(si, si + count), di);
+    si += litLen; di += count;
+    if (di >= uncompressedSize || si + 2 > src.length) break;
+    const offset = src[si] | (src[si + 1] << 8); si += 2;
+    if (offset === 0) break;
+    let matchLen = (token & 0x0F) + 4;
+    if (matchLen === 19) { while (si < src.length) { const e = src[si++]; matchLen += e; if (e !== 255) break; } }
+    let matchPos = di - offset;
+    for (let j = 0; j < matchLen && di < uncompressedSize; j++) dst[di++] = dst[matchPos++];
+  }
+  return dst;
+}
+
+function decompressCatBlob(raw) {
+  if (raw.length < 5) return raw;
+  const usz = raw[0] | (raw[1] << 8) | (raw[2] << 16) | (raw[3] << 24);
+  if (usz <= raw.length) return raw;
+  return lz4DecompressBlock(raw.subarray(4), usz);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SAVE FILE PARSER
+// ═══════════════════════════════════════════════════════════════
+const BINARY_GENDER = { 0: 'male', 1: 'female', 2: 'unknown' };
+let MAX_GEN = 3, TREE_DEPTH = 5;
+
+function readI32(buf, off) {
+  if (off + 4 > buf.length) return 0;
+  return buf[off] | (buf[off+1] << 8) | (buf[off+2] << 16) | (buf[off+3] << 24);
+}
+function readU32(buf, off) {
+  if (off + 4 > buf.length) return 0;
+  return (buf[off] | (buf[off+1] << 8) | (buf[off+2] << 16) | (buf[off+3] << 24)) >>> 0;
+}
+
+function parseSave(db, statusFn) {
+  statusFn('Reading properties…');
+  let currentDay = 0;
+  const propRows = db.exec("SELECT data FROM properties WHERE key='current_day'");
+  if (propRows.length && propRows[0].values.length) currentDay = parseInt(propRows[0].values[0][0]) || 0;
+
+  statusFn('Parsing cat blobs…');
+  const catRows = db.exec("SELECT key, data FROM cats");
+  if (!catRows.length) throw new Error('No cats table found in save file.');
+  const allCats = {}, allIds = new Set();
+  for (const [key, blob] of catRows[0].values) { allIds.add(key); allCats[key] = parseCatBlob(key, blob, currentDay); }
+
+  statusFn('Detecting active cats…');
+  const houseResult = parseHouseState(db, allIds);
+  const advIds = parseAdventureState(db, allIds);
+  let activeSet = new Set([...houseResult.ids, ...advIds].filter(id => allIds.has(id)));
+  if (allIds.size > 0 && activeSet.size > 0 && activeSet.size / allIds.size < 0.30) { /* use roster */ } else { activeSet = allIds; }
+  for (const id of activeSet) { allCats[id].active = true; if (houseResult.rooms[id]) allCats[id].room = houseResult.rooms[id]; }
+
+  statusFn('Building pedigree graph…');
+  const parents = {};
+  const pedRows = db.exec("SELECT data FROM files WHERE key='pedigree'");
+  if (pedRows.length && pedRows[0].values.length) parsePedigree(new Uint8Array(pedRows[0].values[0][0]), parents, allCats, allIds);
+  for (const id of activeSet) { if (!(id in parents)) parents[id] = [null, null]; }
+
+  statusFn('Computing ancestry indices…');
+  const ancWithin = {}, ancAll = {};
+  for (const cidStr of Object.keys(allCats)) { const cid = Number(cidStr); ancWithin[cid] = bfsAncestors(cid, parents, MAX_GEN); ancAll[cid] = allAncestors(cid, parents); }
+
+  statusFn('Building pedigree trees…');
+  const trees = {}, activeIds = [...activeSet].sort((a, b) => a - b);
+  for (const cid of activeIds) trees[cid] = buildTree(cid, parents, allCats, TREE_DEPTH);
+
+  statusFn('Computing compatibility…');
+  const compat = {};
+  for (let i = 0; i < activeIds.length; i++) for (let j = i + 1; j < activeIds.length; j++) {
+    const a = activeIds[i], b = activeIds[j];
+    compat[a + ',' + b] = checkCompat(a, b, allCats, parents, ancWithin, ancAll);
+  }
+
+  return { save: 'save', max_gen: MAX_GEN, tree_depth: TREE_DEPTH,
+    cats: (() => { const o = {}; for (const [id, c] of Object.entries(allCats)) { const [p1, p2] = parents[id] || [null, null]; o[id] = { ...c, p1, p2 }; } return o; })(),
+    active_ids: activeIds, compat, trees, current_day: currentDay, _parents: parents, _allCats: allCats, _ancAll: ancAll };
+}
+
+function parseCatBlob(key, rawArr, currentDay) {
+  const raw = new Uint8Array(rawArr);
+  let d; try { d = decompressCatBlob(raw); } catch { d = raw; }
+  const chars = []; let i = 20;
+  while (i + 1 < d.length) { const lo = d[i], hi = d[i+1]; if (hi !== 0 || lo < 0x20 || lo > 0x7E) break; chars.push(String.fromCharCode(lo)); i += 2; }
+  const name = chars.join('') || `Cat#${key}`, nameEnd = i;
+  let gender = 'unknown';
+  if (nameEnd + 4 <= d.length) { let slen = readU32(d, nameEnd); if (slen > 200) slen = 0; const gOff = nameEnd + 8 + slen; if (gOff + 4 <= d.length) { gender = BINARY_GENDER[readU32(d, gOff)] || 'unknown'; } }
+  let catClass = 'unknown';
+  const text = Array.from(d).map(b => String.fromCharCode(b)).join('');
+  const m = text.match(/(?:male|female|unknown|spidercat|terminator)/);
+  if (m) catClass = m[0];
+  if (catClass === 'spidercat' || catClass === 'terminator') gender = 'unknown';
+  let baseStats = null, mutation = 'none';
+  if (m) { const gwordEnd = m.index + m[0].length;
+    for (let probe = gwordEnd; probe < gwordEnd + 30 && probe + 28 <= d.length; probe++) {
+      const vals = []; let ok = true;
+      for (let s = 0; s < 7; s++) { const v = readU32(d, probe + s * 4); if (v < 1 || v > 20) { ok = false; break; } vals.push(v); }
+      if (ok) { baseStats = vals; const mutOff = probe + 84;
+        if (mutOff + 8 <= d.length) { const mutLen = readU32(d, mutOff); if (mutLen > 0 && mutLen <= 50 && mutOff + 8 + mutLen <= d.length) mutation = Array.from(d.subarray(mutOff + 8, mutOff + 8 + mutLen)).map(b => String.fromCharCode(b)).join(''); }
+        break; } } }
+  let birthday = 0; const bdOff = d.length - 103;
+  if (bdOff >= 0 && bdOff + 4 <= d.length) { birthday = readU32(d, bdOff); if (currentDay > 0 && birthday > currentDay) birthday = 0; }
+  const age = (currentDay > 0 && birthday > 0) ? Math.max(0, currentDay - birthday) : 0;
+  return { id: key, name, gender, age, birthday, cat_class: catClass, active: false, baseStats, mutation, room: null };
+}
+
+function parseHouseState(db) {
+  const rows = db.exec("SELECT data FROM files WHERE key='house_state'");
+  if (!rows.length || !rows[0].values.length) return { ids: new Set(), rooms: {} };
+  const b = new Uint8Array(rows[0].values[0][0]);
+  if (b.length < 8) return { ids: new Set(), rooms: {} };
+  const n = readU32(b, 4); if (n > 10000) return { ids: new Set(), rooms: {} };
+  const ids = new Set(), rooms = {}; let pos = 8;
+  for (let i = 0; i < n; i++) {
+    if (pos + 16 > b.length) break; const cid = readU32(b, pos), slen = readU32(b, pos + 8);
+    if (slen > 200 || pos + 16 + slen + 24 > b.length) break;
+    const room = Array.from(b.subarray(pos + 16, pos + 16 + slen)).map(c => String.fromCharCode(c)).join('');
+    if (cid >= 1 && cid <= 1000000) { ids.add(cid); rooms[cid] = room; }
+    pos += 16 + slen + 24;
+  }
+  return { ids, rooms };
+}
+
+function parseAdventureState(db) {
+  const rows = db.exec("SELECT data FROM files WHERE key='adventure_state'");
+  if (!rows.length || !rows[0].values.length) return new Set();
+  const b = new Uint8Array(rows[0].values[0][0]);
+  if (b.length < 8) return new Set(); const n = readU32(b, 4); if (n > 1000) return new Set();
+  const ids = new Set();
+  for (let i = 0; i < n; i++) { const off = 8 + i * 8 + 4; if (off + 4 > b.length) break; const cid = readU32(b, off); if (cid >= 1 && cid <= 1000000) ids.add(cid); }
+  return ids;
+}
+
+function registerGhost(cid, cats) {
+  if (!(cid in cats)) cats[cid] = { id: cid, name: `Ghost#${cid}`, gender: 'unknown', age: 0, birthday: 0, cat_class: 'unknown', active: false };
+}
+
+function parsePedigree(blob, parents, cats, allIds) {
+  if (blob.length < 64) return;
+  const buf = new ArrayBuffer(blob.length); new Uint8Array(buf).set(blob); const dv = new DataView(buf);
+  let magic, maxId, nslots;
+  try { magic = dv.getBigInt64(0, true); maxId = Number(dv.getBigInt64(8, true)); nslots = Number(dv.getBigInt64(16, true)); }
+  catch(e) { const lo = dv.getInt32(0, true), hi = dv.getInt32(4, true); magic = (hi === -1 && lo === -11) ? -11n : 0n; maxId = dv.getInt32(8, true); nslots = dv.getInt32(16, true); }
+  if (magic !== -11n) return;
+  function resolve(v) { if (v < 1 || v > maxId) return null; registerGhost(v, cats); return v; }
+  function readQ(offset) { try { return Number(dv.getBigInt64(offset, true)); } catch(e) { return dv.getInt32(offset, true); } }
+  for (let i = 0; i < nslots; i++) {
+    const off = 64 + i * 32; if (off + 32 > blob.length) break;
+    const child = readQ(off + 8), parent2 = readQ(off + 16), parent1 = readQ(off + 24);
+    if (child < 1 || child > maxId) continue; registerGhost(child, cats);
+    if (!(child in parents)) parents[child] = [resolve(parent1), resolve(parent2)];
+  }
+  const s2Start = 64 + nslots * 32;
+  if (s2Start + 72 < blob.length) {
+    let s2Off = s2Start + 72;
+    while (s2Off + 192 <= blob.length) {
+      for (let t = 0; t < 128; t += 32) { const off = s2Off + t; if (off + 32 > blob.length) break;
+        const child = readQ(off), p1r = readQ(off + 8), p2r = readQ(off + 16);
+        if (child < 1 || child > maxId) continue;
+        const p1 = (p1r >= 1 && p1r <= maxId) ? resolve(p1r) : null, p2 = (p2r >= 1 && p2r <= maxId) ? resolve(p2r) : null;
+        if ((p1 !== null || p2 !== null) && !(child in parents)) { registerGhost(child, cats); parents[child] = [p1, p2]; }
+      }
+      s2Off += 192;
+    }
+  }
+}
+
+function bfsAncestors(start, parents, maxDepth) {
+  const result = {}, seen = new Set([start]), queue = [[start, 0]];
+  while (queue.length) { const [cur, depth] = queue.shift(); if (depth >= maxDepth) continue;
+    const [p1, p2] = parents[cur] || [null, null];
+    for (const p of [p1, p2]) { if (p === null || seen.has(p)) continue; seen.add(p); const d2 = depth + 1; result[p] = Math.min(result[p] ?? 999, d2); queue.push([p, d2]); }
+  }
+  return result;
+}
+
+function allAncestors(cid, parents, _seen) {
+  if (!_seen) _seen = new Set(); if (_seen.has(cid)) return new Set(); _seen.add(cid);
+  const result = new Set(), [p1, p2] = parents[cid] || [null, null];
+  for (const p of [p1, p2]) { if (p !== null) { result.add(p); for (const a of allAncestors(p, parents, _seen)) result.add(a); } }
+  return result;
+}
+
+function buildTree(catId, parents, cats, maxDepth) {
+  function build(cid, depth) {
+    if (cid === null || depth > maxDepth) return null; const c = cats[cid];
+    const node = { id: cid, name: c ? c.name : `Ghost#${cid}`, gender: c ? c.gender : 'unknown', active: c ? c.active : false, cat_class: c ? c.cat_class : 'unknown' };
+    const [p1, p2] = parents[cid] || [null, null]; node.p1 = p1 ? build(p1, depth + 1) : null; node.p2 = p2 ? build(p2, depth + 1) : null; return node;
+  }
+  return build(catId, 0);
+}
+
+function checkCompat(a, b, cats, parents, ancWithin, ancAll) {
+  const ca = cats[a], cb = cats[b];
+  if (a === b) return { ok: false, reason: 'Same cat', risk: 'high', shared: [], lineage: null };
+  if (ca.gender === cb.gender && ca.gender !== 'unknown') return { ok: false, reason: `Same gender (${ca.gender})`, risk: 'high', shared: [], lineage: null };
+  if (ancAll[a] && ancAll[a].has(b)) return { ok: false, reason: 'Direct lineage — highest inbreeding risk', risk: 'high', shared: [], lineage: `${cb.name} is a direct ancestor of ${ca.name}` };
+  if (ancAll[b] && ancAll[b].has(a)) return { ok: false, reason: 'Direct lineage — highest inbreeding risk', risk: 'high', shared: [], lineage: `${ca.name} is a direct ancestor of ${cb.name}` };
+  const awA = ancWithin[a] || {}, awB = ancWithin[b] || {};
+  const shared = Object.keys(awA).filter(k => k in awB).map(Number).sort((a, b) => a - b);
+  if (shared.length) return { ok: false, reason: `Shared ancestor(s) within ${MAX_GEN} gen — inbreeding risk`, risk: 'moderate', shared, lineage: null };
+  return { ok: true, reason: 'No known shared ancestry', risk: 'safe', shared: [], lineage: null };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REPORT UI
+// ═══════════════════════════════════════════════════════════════
+let D = null, sel = null, currentTab = 'profile';
+
+function recompute() {
+  if (!D) return;
+  const parents = D._parents, allCats = D._allCats, activeIds = D.active_ids;
+  const ancWithin = {}, ancAll = D._ancAll;
+  for (const cidStr of Object.keys(allCats)) ancWithin[Number(cidStr)] = bfsAncestors(Number(cidStr), parents, MAX_GEN);
+  const trees = {}; for (const cid of activeIds) trees[cid] = buildTree(cid, parents, allCats, TREE_DEPTH);
+  const compat = {};
+  for (let i = 0; i < activeIds.length; i++) for (let j = i + 1; j < activeIds.length; j++) {
+    const a = activeIds[i], b = activeIds[j]; compat[a + ',' + b] = checkCompat(a, b, allCats, parents, ancWithin, ancAll);
+  }
+  D.trees = trees; D.compat = compat; D.max_gen = MAX_GEN; D.tree_depth = TREE_DEPTH;
+  $('gen-badge').textContent = `inbreeding window: ${MAX_GEN} generations`;
+  renderMain();
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const gi = g => g === 'male' ? '♂' : g === 'female' ? '♀' : '⚥';
+const gc = g => g === 'male' ? 'gm' : g === 'female' ? 'gf' : 'gu';
+const cat = id => D.cats[String(id)];
+const getCompat = (a, b) => { const k1 = Math.min(a,b)+','+Math.max(a,b); return D.compat[k1]; };
+
+function statColor(val) {
+  const t = Math.max(0, Math.min(1, (val - 1) / 7));
+  const r = Math.round(140 + (90 - 140) * t);
+  const g = Math.round(40 + (120 - 40) * t);
+  const b = Math.round(35 + (40 - 35) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function statSquaresH(stats) {
+  if (!stats) return '';
+  const N = ['STR', 'DEX', 'CON', 'INT', 'SPD', 'CHA', 'LCK'];
+  return '<div class="stat-grid">' + stats.map((v, i) =>
+    `<div class="stat-sq"><div class="stat-sq-box" style="background:${statColor(v)}">${v}</div><div class="stat-sq-label">${N[i]}</div></div>`
+  ).join('') + '</div>';
+}
+
+function statRangeH(sA, sB) {
+  if (!sA || !sB) return '';
+  const N = ['STR','DEX','CON','INT','SPD','CHA','LCK'];
+  return '<div class="stat-range-grid">' + N.map((name, i) => {
+    const lo = Math.min(sA[i], sB[i]), hi = Math.max(sA[i], sB[i]), avg = (lo + hi) / 2;
+    return `<div class="stat-range-item"><div class="stat-range-box" style="background:${statColor(avg)}">${lo === hi ? lo : lo+'–'+hi}</div><div class="stat-range-label">${name}</div></div>`;
+  }).join('') + '</div>';
+}
+
+function initReport(data) {
+  D = data;
+  $('report-screen').style.display = 'block';
+  $('save-name').textContent = D.save;
+  $('gen-badge').textContent = `inbreeding window: ${D.max_gen} generations`;
+  $('day-badge').textContent = `day ${D.current_day}`;
+  $('search').oninput = () => buildList();
+  $('btn-new').onclick = () => location.reload();
+  const overlay = $('settings-overlay');
+  $('btn-settings').onclick = () => { $('s-gen').value = MAX_GEN; $('s-gen-val').textContent = MAX_GEN; $('s-tree').value = TREE_DEPTH; $('s-tree-val').textContent = TREE_DEPTH; overlay.classList.add('open'); };
+  $('s-gen').oninput = function() { $('s-gen-val').textContent = this.value; };
+  $('s-tree').oninput = function() { $('s-tree-val').textContent = this.value; };
+  $('settings-close').onclick = () => overlay.classList.remove('open');
+  overlay.onclick = e => { if (e.target === overlay) overlay.classList.remove('open'); };
+  $('settings-apply').onclick = () => { const ng = parseInt($('s-gen').value), nt = parseInt($('s-tree').value); overlay.classList.remove('open'); if (ng !== MAX_GEN || nt !== TREE_DEPTH) { MAX_GEN = ng; TREE_DEPTH = nt; recompute(); } };
+  buildList();
+  wireGoLinks();
+}
+
+function buildList() {
+  const q = ($('search').value || '').toLowerCase(), list = $('cat-list');
+  list.innerHTML = D.active_ids
+    .filter(id => { const c = cat(id); return !q || c.name.toLowerCase().includes(q); })
+    .map(id => {
+      const c = cat(id);
+      return `<div class="catrow${id === sel ? ' sel' : ''}" data-id="${id}">
+        <span class="gb ${gc(c.gender)}">${gi(c.gender)}</span>
+        <span class="cname">${esc(c.name)}</span></div>`;
+    }).join('');
+  list.querySelectorAll('.catrow').forEach(r => { r.onclick = () => select(Number(r.dataset.id)); });
+}
+
+function select(id) { sel = id; buildList(); renderMain(); }
+
+let compatSort = 'name', compatFilter = 'all', compatSortAsc = true;
+
+function renderMain() {
+  const m = $('main');
+  if (!sel) { m.innerHTML = '<div id="empty"><div class="big">🐱</div><div>Select a cat from the sidebar<br>to view its pedigree and breeding partners</div></div>'; return; }
+  const c = cat(sel), all = [];
+  D.active_ids.forEach(oid => {
+    if (oid === sel) return; const r = getCompat(sel, oid); if (!r) return;
+    if (!r.reason.includes('Same gender')) all.push({ id: oid, ...r });
+  });
+  const safeCount = all.filter(r => r.ok).length, riskCount = all.filter(r => !r.ok).length;
+  let html = `<div id="tab-bar">
+    <button class="tab-btn${currentTab === 'profile' ? ' on' : ''}" data-tab="profile">🐈 Profile</button>
+    <button class="tab-btn${currentTab === 'pedigree' ? ' on' : ''}" data-tab="pedigree">🌳 Pedigree</button>
+    <button class="tab-btn${currentTab === 'compat' ? ' on' : ''}" data-tab="compat">💕 Breeding<span class="cnt ck">${safeCount}</span><span class="cnt cb">${riskCount}</span></button>
+  </div>`;
+  html += `<div class="tab-panel${currentTab === 'profile' ? ' active' : ''}" id="tp-profile">${profileH(c)}</div>`;
+  html += `<div class="tab-panel${currentTab === 'pedigree' ? ' active' : ''}" id="tp-pedigree">${treeH(sel)}</div>`;
+  html += `<div class="tab-panel${currentTab === 'compat' ? ' active' : ''}" id="tp-compat">${compatH(all)}</div>`;
+  m.innerHTML = html;
+  wireTabBar(); wireCompat(); scrollTreeToRoot();
+}
+
+function scrollTreeToRoot() {
+  const wrap = $('tree-wrap'), root = document.getElementById('tree-root');
+  if (!wrap || !root) return;
+  const wrapRect = wrap.getBoundingClientRect();
+  wrap.scrollLeft = root.offsetLeft + root.offsetWidth / 2 - wrapRect.width / 2;
+  wrap.scrollTop = root.offsetTop + root.offsetHeight + 40 - wrapRect.height;
+  if (wrap.scrollTop < 0) wrap.scrollTop = 0;
+}
+
+function wireTabBar() {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.onclick = () => { currentTab = b.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('on')); b.classList.add('on');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tp-' + currentTab));
+      if (currentTab === 'pedigree') setTimeout(scrollTreeToRoot, 0);
+    };
+  });
+}
+
+function wireCompat() {
+  const searchEl = document.getElementById('compat-search');
+  if (!searchEl) return;
+  searchEl.oninput = () => filterCompatList();
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.onclick = () => { compatFilter = b.dataset.f; document.querySelectorAll('.filter-btn').forEach(x => x.classList.toggle('on', x.dataset.f === compatFilter)); filterCompatList(); };
+  });
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.onclick = () => {
+      if (compatSort === b.dataset.s) { compatSortAsc = !compatSortAsc; }
+      else { compatSort = b.dataset.s; compatSortAsc = true; }
+      document.querySelectorAll('.sort-btn').forEach(x => {
+        const label = x.dataset.s.charAt(0).toUpperCase() + x.dataset.s.slice(1);
+        x.classList.toggle('on', x.dataset.s === compatSort);
+        x.textContent = x.dataset.s === compatSort ? label + (compatSortAsc ? ' \u25B2' : ' \u25BC') : label;
+      });
+      filterCompatList();
+    };
+  });
+  document.querySelectorAll('.cr').forEach(row => {
+    row.onclick = () => { const det = document.getElementById('det-' + row.dataset.id); if (det) det.classList.toggle('open'); };
+  });
+  filterCompatList();
+}
+
+function filterCompatList() {
+  const q = (document.getElementById('compat-search')?.value || '').toLowerCase();
+  const items = [];
+  document.querySelectorAll('.cr').forEach(row => {
+    const id = Number(row.dataset.id), c = cat(id), risk = row.dataset.risk;
+    const nameMatch = !q || c.name.toLowerCase().includes(q);
+    const filterMatch = compatFilter === 'all' || (compatFilter === 'safe' && risk === 'safe') || (compatFilter === 'risk' && risk !== 'safe');
+    const show = nameMatch && filterMatch;
+    row.style.display = show ? '' : 'none';
+    const det = document.getElementById('det-' + id);
+    if (det) { if (!show) { det.style.display = 'none'; det.classList.remove('open'); } else { det.style.display = ''; } }
+    if (show) items.push({ row, det, name: c.name, risk });
+  });
+  const parent = items[0]?.row.parentNode; if (!parent) return;
+  const riskOrder = { high: 0, moderate: 1, safe: 2 };
+  if (compatSort === 'risk') items.sort((a, b) => { const cmp = riskOrder[a.risk] - riskOrder[b.risk] || a.name.localeCompare(b.name); return compatSortAsc ? cmp : -cmp; });
+  else items.sort((a, b) => { const cmp = a.name.localeCompare(b.name); return compatSortAsc ? cmp : -cmp; });
+  items.forEach(({ row, det }) => { parent.appendChild(row); if (det) parent.appendChild(det); });
+}
+
+function wireGoLinks() {
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-go]');
+    if (el) { e.stopPropagation(); const id = Number(el.dataset.go); if (D.active_ids.includes(id)) select(id); }
+  });
+}
+
+// ── Profile ──
+function profileH(c) {
+  const p1 = c.p1 ? cat(c.p1) : null, p2 = c.p2 ? cat(c.p2) : null;
+  const pl = p => {
+    if (!p) return '<span style="color:var(--muted)">Unknown (stray/founder)</span>';
+    if (p.active) return `<span class="gb ${gc(p.gender)}" style="width:26px;height:26px;font-size:15px">${gi(p.gender)}</span> <span class="plink-active" data-go="${p.id}">${esc(p.name)}</span>`;
+    return `<span class="gb ${gc(p.gender)}" style="width:26px;height:26px;font-size:15px">${gi(p.gender)}</span> <span class="plink-inactive">${esc(p.name)} <span style="font-size:12px">(inactive)</span></span>`;
+  };
+  const hasMut = c.mutation && c.mutation !== 'none';
+  const mutHtml = hasMut ? `<span class="mutation-badge has">⚠ ${esc(c.mutation)}</span>` : '<span class="mutation-badge clean">✓ None</span>';
+  const roomName = c.room ? c.room.replace(/_/g, ' ') : 'Unknown';
+  return `<div class="panel"><div class="ph">Profile</div><div class="pb" style="text-align:center">
+    <div class="profile-header"><span class="gb gb-lg ${gc(c.gender)}">${gi(c.gender)}</span><div><div class="pname">${esc(c.name)}</div></div></div>
+    <div class="profile-stats">
+      <div class="stat-card"><div class="stat-label">Gender</div><div class="stat-value" style="color:var(--${c.gender === 'male' ? 'male' : c.gender === 'female' ? 'female' : 'unk'})">${gi(c.gender)} ${c.gender}</div></div>
+      <div class="stat-card"><div class="stat-label">Age</div><div class="stat-value">${c.age} days</div></div>
+      <div class="stat-card"><div class="stat-label">Room</div><div class="stat-value" style="font-size:14px">${esc(roomName)}</div></div>
+      <div class="stat-card"><div class="stat-label">Mutation</div><div class="stat-value">${mutHtml}</div></div>
+    </div>
+    ${statSquaresH(c.baseStats)}
+    <div class="pparents">
+      <div style="margin-bottom:8px"><strong style="color:var(--txt2)">Parents</strong></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">${pl(p1)}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px">${pl(p2)}</div>
+    </div></div></div>`;
+}
+
+// ── Compat (unified table) ──
+function compatH(all) {
+  const selCat = cat(sel);
+  const riskLabel = r => {
+    if (r.risk === 'high') return '<span class="cr-risk high">⛔ High Risk</span>';
+    if (r.risk === 'moderate') return '<span class="cr-risk moderate">⚠ Inbreeding Risk</span>';
+    return '<span class="cr-risk safe">✓ Safe</span>';
+  };
+  const rows = all.map(r => {
+    const oc = cat(r.id); let det = '';
+    if (r.lineage) det += `<div style="margin-bottom:4px">⚠ ${esc(r.lineage)}</div>`;
+    if (r.shared && r.shared.length) {
+      det += `<div style="margin-bottom:6px">Shared ancestors: ${r.shared.map(sid => { const sc = cat(sid); return `<span class="stag" data-go="${sid}">${sc ? esc(sc.name) : 'Ghost'} #${sid}</span>`; }).join('')}</div>`;
+    }
+    if (selCat.baseStats && oc.baseStats) det += '<div style="margin-top:6px"><strong style="color:var(--txt2)">Offspring stat range:</strong></div>' + statRangeH(selCat.baseStats, oc.baseStats);
+    return `<div class="cr" data-id="${r.id}" data-risk="${r.risk}">
+      <span class="cr-name"><span class="gb ${gc(oc.gender)}" style="width:28px;height:28px;font-size:16px">${gi(oc.gender)}</span>
+      <span data-go="${r.id}" style="color:var(--blue);cursor:pointer;font-weight:500">${esc(oc.name)}</span></span>
+      ${riskLabel(r)}<span class="cr-reason">${esc(r.reason)}</span>
+    </div><div class="cdet" id="det-${r.id}">${det}</div>`;
+  }).join('');
+  return `<div class="panel"><div class="ph">Breeding Partners</div>
+    <div id="compat-controls">
+      <input type="text" id="compat-search" placeholder="🔍 Filter by name…">
+      <span style="color:var(--muted);font-size:12px">Sort:</span>
+      <button class="sort-btn${compatSort==='name'?' on':''}" data-s="name">Name</button>
+      <button class="sort-btn${compatSort==='risk'?' on':''}" data-s="risk">Risk</button>
+      <span style="color:var(--muted);font-size:12px;margin-left:6px">Show:</span>
+      <button class="filter-btn${compatFilter==='all'?' on':''}" data-f="all">All</button>
+      <button class="filter-btn${compatFilter==='safe'?' on':''}" data-f="safe">Safe</button>
+      <button class="filter-btn${compatFilter==='risk'?' on':''}" data-f="risk">At Risk</button>
+    </div>
+    <div id="clist">${rows || '<div style="padding:20px;color:var(--muted);text-align:center">No breeding partners available.</div>'}</div></div>`;
+}
+
+// ── Pedigree Tree ──
+function treeH(rootId) {
+  const treeData = D.trees[String(rootId)];
+  if (!treeData) return `<div class="panel"><div class="ph">🌳 Pedigree</div><div class="pb" style="color:var(--muted);text-align:center">No pedigree data available.</div></div>`;
+  const CW = 90, CH = 34, HG = 8, VG = 28;
+  function subtreeW(n) { if (!n) return 0; const lw = subtreeW(n.p1), rw = subtreeW(n.p2); if (!lw && !rw) return 1; if (!lw) return rw; if (!rw) return lw; return lw + rw; }
+  const unitW = CW + HG, totalUnits = subtreeW(treeData), totalW = totalUnits * unitW - HG;
+  function maxGen(n) { if (!n) return 0; return 1 + Math.max(maxGen(n.p1), maxGen(n.p2)); }
+  const depth = maxGen(treeData), totalH = depth * (CH + VG) - VG;
+  const nodes = [], edges = [];
+  function layout(n, leftUnit, gen) {
+    if (!n) return -1; const w = subtreeW(n);
+    const cx = (leftUnit + w / 2) * unitW - HG / 2, row = depth - 1 - gen, cy = row * (CH + VG);
+    nodes.push({ node: n, cx, cy, gen });
+    const lw = subtreeW(n.p1), rw = subtreeW(n.p2);
+    if (lw || rw) { const midY = cy - VG / 2;
+      if (lw && rw) { const lCx = layout(n.p1, leftUnit, gen + 1), rCx = layout(n.p2, leftUnit + lw, gen + 1);
+        edges.push({ x1: cx, y1: cy, x2: cx, y2: midY }); edges.push({ x1: lCx, y1: midY, x2: rCx, y2: midY });
+        const pBotY = cy - (CH + VG) + CH; edges.push({ x1: lCx, y1: pBotY, x2: lCx, y2: midY }); edges.push({ x1: rCx, y1: pBotY, x2: rCx, y2: midY });
+      } else { const pCx = lw ? layout(n.p1, leftUnit, gen + 1) : layout(n.p2, leftUnit, gen + 1); edges.push({ x1: cx, y1: cy, x2: pCx, y2: cy - (CH + VG) + CH }); }
+    }
+    return cx;
+  }
+  layout(treeData, 0, 0);
+  let cards = '', lines = '';
+  for (const { node: n, cx, cy } of nodes) {
+    const c = cat(n.id), isRoot = n.id === rootId, isActive = c && c.active;
+    const go = (!isRoot && isActive) ? `data-go="${n.id}"` : '';
+    const cls = 'tcard' + (isRoot ? ' root' : '') + (c && !c.active ? ' ghost' : '');
+    const gSym = gi(n.gender), gCol = n.gender === 'male' ? 'var(--male)' : n.gender === 'female' ? 'var(--female)' : 'var(--unk)';
+    const nameCol = isRoot ? 'var(--gold)' : 'var(--txt)', left = cx - CW / 2;
+    cards += `<div class="${cls}" ${go} ${isRoot ? 'id="tree-root"' : ''} style="left:${left}px;top:${cy}px;width:${CW}px;height:${CH}px">
+      <div class="tn" style="color:${nameCol}">${esc(n.name)}</div><div class="tm"><span style="color:${gCol}">${gSym}</span></div></div>`;
+  }
+  for (const { x1, y1, x2, y2 } of edges) lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  const padX = 16, padY = 12, svgW = totalW + padX * 2, svgH = totalH + padY * 2;
+  return `<div class="panel"><div class="ph">🌳 Pedigree <span class="sub">up to ${TREE_DEPTH} generations · click to navigate</span></div>
+    <div class="pb"><div class="tree-wrap" id="tree-wrap">
+      <div class="tree-container" style="width:${svgW}px;height:${svgH}px">
+        <svg width="${svgW}" height="${svgH}"><g transform="translate(${padX},${padY})">${lines}</g></svg>
+        <div style="position:absolute;left:${padX}px;top:${padY}px;width:${totalW}px;height:${totalH}px">${cards}</div>
+      </div></div>
+      <div class="tree-legend">
+        <span><span style="display:inline-block;width:12px;height:12px;border:1px solid var(--gold);background:var(--gold3);border-radius:3px"></span> Selected</span>
+        <span><span style="display:inline-block;width:12px;height:12px;border:1px solid var(--bdr);background:var(--surf2);border-radius:3px"></span> Known</span>
+        <span><span style="display:inline-block;width:12px;height:12px;border:1px solid var(--bdr);background:var(--surf2);border-radius:3px;opacity:.45"></span> Ghost</span>
+      </div></div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILE HANDLING + sql.js INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+let SQL = null;
+function showError(msg) {
+  $('loading-screen').style.display = 'flex'; $('upload-screen').style.display = 'none';
+  $('load-spinner').style.display = 'none'; $('load-status').textContent = 'Something went wrong:';
+  $('load-error').textContent = msg; $('load-error').style.display = 'block'; $('load-retry').style.display = '';
+  console.error('Mewgenics Error:', msg);
+}
+window.onerror = function(msg, src, line) { showError(`${msg} (line ${line})`); };
+window.onunhandledrejection = function(e) { showError(e.reason?.message || String(e.reason)); };
+
+async function loadSqlJs() {
+  if (SQL) return; $('load-status').textContent = 'Loading sql.js (SQLite for browser)…';
+  const cdns = ['https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js','https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js'];
+  const bases = ['https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/','https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/'];
+  for (let i = 0; i < cdns.length; i++) {
+    try { const s = document.createElement('script'); s.src = cdns[i]; document.head.appendChild(s);
+      await new Promise((res, rej) => { s.onload = res; s.onerror = () => rej(new Error('fail')); setTimeout(() => rej(new Error('timeout')), 15000); });
+      if (typeof window.initSqlJs === 'function') { SQL = await window.initSqlJs({ locateFile: f => bases[i] + f }); return; }
+    } catch(e) { console.warn('CDN failed:', cdns[i], e.message); }
+  }
+  throw new Error('Failed to load sql.js from CDN.');
+}
+
+async function processFile(file) {
+  const preGen = document.getElementById("pre-gen"), preTree = document.getElementById("pre-tree");
+  if (preGen) MAX_GEN = parseInt(preGen.value) || 3; if (preTree) TREE_DEPTH = parseInt(preTree.value) || 5;
+  $('upload-screen').style.display = 'none'; $('loading-screen').style.display = 'flex'; $('load-error').style.display = 'none';
+  try { await loadSqlJs(); $('load-status').textContent = 'Reading save file…';
+    const buf = await file.arrayBuffer(); $('load-status').textContent = 'Opening SQLite database…';
+    const db = new SQL.Database(new Uint8Array(buf)); $('load-status').textContent = 'Parsing save data…';
+    const data = parseSave(db, msg => { $('load-status').textContent = msg; }); data.save = file.name; db.close();
+    $('loading-screen').style.display = 'none'; initReport(data);
+  } catch(err) { showError(err.message || String(err)); }
+}
+
+const dz = $('drop-zone'), fi = $('file-input');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+fi.addEventListener('change', () => { if (fi.files[0]) processFile(fi.files[0]); });
+
+// Wire pre-load setting sliders
+const preGenEl = document.getElementById("pre-gen");
+const preTreeEl = document.getElementById("pre-tree");
+if (preGenEl) preGenEl.oninput = function() { document.getElementById("pre-gen-val").textContent = this.value; };
+if (preTreeEl) preTreeEl.oninput = function() { document.getElementById("pre-tree-val").textContent = this.value; };
+</script>
+</body>
+</html>
